@@ -1,12 +1,3 @@
-#import random
-
-#chars = "+-/*!&$#?=@abcdefghijklnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-#random_string = ""
-#x = int(input("Mau berapa password?"))
-#for i in range(x):
-    #random_string += random.choice(chars)
-#print(random_string)
-
 import random
 
 climate_words = {
@@ -42,7 +33,7 @@ climate_words = {
     },
     "solar": {
         "topic": "renewable energy",
-        "hint": "only appears during the daytime", 
+        "hint": "the source of this energy only appears during the daytime", 
         "explanation": "Solar energy can significantly benefit the environment by reducing carbon emissions, decreasing reliance on fossil fuels, and improving air and water quality."
     },
     "wind": {
@@ -55,7 +46,26 @@ climate_words = {
         "hint": "energy from moving water", 
         "explanation": "Hydropower—energy derived from moving water—can significantly benefit the environment by reducing reliance on fossil fuels and mitigating climate change."
     },
-    
+    "geothermal": {
+        "topic": "renewable energy",
+        "hint": "energy gained from drilling deep underground and pumping extremely hot water up to the earth's surface", 
+        "explanation": "Geothermal energy can significantly benefit the environment by reducing reliance on fossil fuels and mitigating climate change."
+    },
+    "plant": {
+        "topic": "actions",
+        "hint": "living beings are usually classified into three sections: humans, animals, and...?", 
+        "explanation": "Trees can absorb CO2—a major greenhouse gas, which can reduce global warming. Therefore, an easy way to reduce the effects of global warming is by planting trees."
+    },
+    "plant": {
+        "topic": "actions",
+        "hint": "living beings are usually classified into three sections: humans, animals, and...?", 
+        "explanation": "Trees can absorb CO2—a major greenhouse gas, which can reduce global warming. Therefore, an easy way to reduce the effects of global warming is by planting trees."
+    },
+    "educate": {
+        "topic": "actions",
+        "hint": "synonym of teach", 
+        "explanation": "Education can encourage others to adopt more sustainable practices, support climate-friendly policies, and contribute to innovative solutions."
+    },
 }
   
 class GameSession:
