@@ -15,10 +15,21 @@ bot = commands.Bot(command_prefix='$', intents=intents)
 
 STATS_FILE = "stats.json"
 
+def merge_duplicate_stats():
+    cleaned_stats = {}
+    for user_id, stats in player_stats.items():
+        uid = str(user_id)
+        if uid not in cleaned_stats:
+            cleaned_stats[uid] = {"wins": 0, "losses": 0}
+        cleaned_stats[uid]["wins"] += stats.get("wins", 0)
+        cleaned_stats[uid]["losses"] += stats.get("losses", 0)
+    return cleaned_stats
+
 # Try to load stats from file when bot starts
 if os.path.exists(STATS_FILE):
     with open(STATS_FILE, "r") as f:
         player_stats = json.load(f)
+    player_stats = merge_duplicate_stats()
 else:
     player_stats = {}
 
@@ -28,28 +39,39 @@ def save_stats():
     with open(STATS_FILE, "w") as f:
         json.dump(player_stats, f)
 
-@bot.event
-async def on_ready():
-    print(f'We have logged in as {bot.user}')
+def start_new_game(user_id, ctx):
+    word, info = random.choice(list(climate_words.items()))
+    session = GameSession(word)
+    games[user_id] = session
 
-@bot.command()
-async def climatewordle(ctx):
-    word, data = random.choice(list(climate_words.items()))
-    topic = data["topic"]
-    games[ctx.author.id] = GameSession(word)
-    await ctx.send(
-        f"🌍 Let's play Climate Wordle!\n**Topic:** {topic}\n"
-        f"Your word has {len(word)} letters: `{' '.join(games[ctx.author.id].display)}`\n"
+    return (
+        f"🌍 Let's play Climate Wordle!\n"
+        f"**Topic:** {info['topic']}\n"
+        f"Your word has {len(word)} letters: `{' '.join(session.display)}`\n"
         f"Type your guess using `$guess <word>`.\n"
         f"🟩 = Letter is in the word and in the correct position.\n"
         f"🟨 = Letter is in the word but in the wrong position.\n"
         f"⬜️ = Letter is not in the word.\n"
     )
 
+
+@bot.command()
+async def climatewordle(ctx):
+    user_id = str(ctx.author.id)
+
+    if user_id in games:
+        await ctx.send("🟡 You already have an active game! Finish it or use `$giveup` if you're stuck.")
+        return
+
+    message = start_new_game(user_id, ctx)
+    await ctx.send(message)
+
+
 @bot.command()
 async def guess(ctx, *, user_input: str):
     """Handle user guesses."""
-    session = games.get(ctx.author.id)
+    user_id = str(ctx.author.id)
+    session = games.get(user_id)
 
     if not session:
         await ctx.send("❗ You don't have an active game. Start one using `$climatewordle`.")
@@ -62,17 +84,19 @@ async def guess(ctx, *, user_input: str):
     if session.guess(user_input):
         await ctx.send(
             f"✅ Correct! The word was `{session.word}`.\n"
-            f"**How this helps the climate:** {climate_words[session.word]['explanation']}"
+            f"**How this helps the climate:** {climate_words[session.word]['explanation']} \n"
+            f"Type $playagain to keep playing!"
         )
         # Ambil ID pemain
-        user_id = ctx.author.id
+        user_id = str(ctx.author.id)
 
         if user_id not in player_stats:
             player_stats[user_id] = {"wins": 0, "losses": 0}
         player_stats[user_id]["wins"] += 1
         save_stats()
 
-        del games[ctx.author.id]
+        del games[user_id]
+
 
     else:
         feedback = get_wordle_feedback(session.word, user_input)
@@ -88,22 +112,25 @@ async def guess(ctx, *, user_input: str):
         else:
             await ctx.send(
                 f"🛑 Game over! The word was `{session.word}`.\n"
-                f"**How this helps the climate:** {climate_words[session.word]['explanation']}"
+                f"**How this helps the climate:** {climate_words[session.word]['explanation']} \n"
+                f"Type $playagain to keep playing!"
             )
 
-            user_id = ctx.author.id
+            user_id = str(ctx.author.id)
             if user_id not in player_stats:
                 player_stats[user_id] = {"wins": 0, "losses": 0}
             player_stats[user_id]["losses"] += 1
             save_stats()
 
-            del games[ctx.author.id]
-            del games[ctx.author.id]
+            del games[user_id]
+
 
 @bot.command()
 async def hint(ctx):
     """Optional hint for the current climate word."""
-    session = games.get(ctx.author.id)
+    user_id = str(ctx.author.id)
+    session = games.get(user_id)
+
 
     if not session:
         await ctx.send("❗ You don't have an active game. Start one using `$climatewordle`.")
@@ -118,7 +145,7 @@ async def hint(ctx):
 
 @bot.command()
 async def stats(ctx):
-    user_id = ctx.author.id
+    user_id = str(ctx.author.id)
     stats = player_stats.get(user_id)
 
     if not stats:
@@ -143,13 +170,39 @@ async def leaderboard(ctx):
         await ctx.send("🏁 No one has played yet!")
         return
 
-    leaderboard = sorted(player_stats.items(), key=lambda item: item[1]["wins"], reverse=True)
+    sorted_leaderboard = sorted(
+        player_stats.items(),
+        key=lambda item: item[1]["wins"],
+        reverse=True
+    )
+
     message = "🏆 **Leaderboard Climate Wordle** 🏆\n"
+    medals = ["🥇", "🥈", "🥉"]
 
-    for i, (user_id, stats) in enumerate(leaderboard[:10], start=1):
-        user = await bot.fetch_user(user_id)
-        message += f"{i}. {user.name} - {stats['wins']} wins, {stats['losses']} losses\n"
+    seen = set()
+    rank = 1
 
+    for user_id, stats in sorted_leaderboard:
+        if user_id in seen:
+            continue
+        seen.add(user_id)
+
+        user = await bot.fetch_user(int(user_id))
+        medal = medals[rank - 1] if rank <= 3 else f"{rank}."
+        message += f"{medal} {user.name} - {stats['wins']} wins, {stats['losses']} losses\n"
+        rank += 1
+
+    await ctx.send(message)
+
+@bot.command()
+async def playagain(ctx):
+    user_id = str(ctx.author.id)
+
+    if user_id in games:
+        await ctx.send("🟡 You already have an active game! Finish it or use `$giveup`.")
+        return
+
+    message = start_new_game(user_id, ctx)
     await ctx.send(message)
 
 
